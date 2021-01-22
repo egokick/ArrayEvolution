@@ -112,52 +112,37 @@ namespace ArrayEvolution
             foreach (var animal in animals.OrderBy(x=>x.Name))
             {
                 var animalsJson = JsonConvert.SerializeObject(animal);
+                if (!animal.IsAlive) Console.ForegroundColor = ConsoleColor.DarkRed;
+                else Console.ForegroundColor = ConsoleColor.Gray;
                 Console.WriteLine(animalsJson);
             }
+            Console.ForegroundColor = ConsoleColor.Gray;
         }
         
         private static List<Animal> AnimalsTick(List<Animal> animals, int x, int y)
         {
-            var rng = new Random();
-            foreach(var a in animals)
-            {
-                var rngX = rng.Next(-1, 2);
-                var rngY = rng.Next(-1, 2);
-                if (rngX != 0 || rngY != 0)
+            var rng = new Random();            
+            animals.Where(x=>x.IsAlive)
+                .ToList()
+                .ForEach(a =>
                 {
-                    a.Health += -3; // Decrement resources if animal moved
+                    var rngX = rng.Next(-1, 2);
+                    var rngY = rng.Next(-1, 2);
+                    if (rngX != 0 || rngY != 0)
+                    {
+                        a.Health += -3; // Decrement resources if animal moved
+                    }
+                    else
+                    {
+                        a.Health += -1; // Decrement resources if not moved
+                    }
+                    // walk randomly;
+                    a.PositionX += a.PositionX + rngX > x - 1 || a.PositionX + rngX < 0 ? 0 : rngX;
+                    a.PositionY += a.PositionY + rngY > y - 1 || a.PositionY + rngY < 0 ? 0 : rngY;
                 }
-                else
-                {
-                    a.Health += -1; // Decrement resources if not moved
-                }
-                // walk randomly;
-                a.PositionX += a.PositionX + rngX > x - 1 || a.PositionX + rngX < 0 ? 0 : rngX;
-                a.PositionY += a.PositionY + rngY > y - 1 || a.PositionY + rngY < 0 ? 0 : rngY;
-            }
-            //animals.ForEach(a =>
-            //    {
-            //        var rngX = rng.Next(-1, 2);
-            //        var rngY = rng.Next(-1, 2);
-            //        if (rngX != 0 || rngY != 0)
-            //        {
-            //            a.Health += -3; // Decrement resources if animal moved
-            //        }
-            //        else
-            //        {
-            //            a.Health+= -1; // Decrement resources if not moved
-            //        }                    
-            //        // walk randomly;
-            //        a.PositionX += a.PositionX + rngX > x - 1 || a.PositionX + rngX < 0 ? 0 : rngX;
-            //        a.PositionY += a.PositionY + rngY > y - 1 || a.PositionY + rngY < 0 ? 0 : rngY;
-            //    }
-            //);
+            );
 
-            //if (animals.All(a => a.Resources <= 4 || !a.IsAlive))
-            //{
-            //    animals = GetAnimals(x, y, 7); // reset the animals because everyone is low energy or dead
-            //}
-            return animals.Where(animal=>animal.IsAlive).ToList();
+            return animals;
         }
         private static List<Animal> GetAnimals(int x, int y, int animalCount = 10)
         {
@@ -189,7 +174,7 @@ namespace ArrayEvolution
                 {
                     var isEndLine = y != array.GetLength(1) - 1;
                     var character = "-";
-                    var animal = animals.FirstOrDefault(a => a.PositionX == x && a.PositionY == y);
+                    var animal = animals.FirstOrDefault(a => a.IsAlive && a.PositionX == x && a.PositionY == y);
                     var animalInCell = animal != null;
                     var plant = fauna.FirstOrDefault(f => f.IsAlive && f.PositionX == x && f.PositionY == y);
                     var plantInCell = plant != null;
@@ -240,7 +225,12 @@ namespace ArrayEvolution
                 Console.Write(c);
                 Console.ForegroundColor = defaultColor;
             }
-            
+            Console.SetCursorPosition(0, 21);
+            for(int i = 0; i < 10; i++)
+            {
+                Console.WriteLine("                                                                                                                                       ");
+            }
+            Console.SetCursorPosition(0, 21);
         }
     }
 }
