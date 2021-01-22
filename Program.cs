@@ -16,7 +16,6 @@ namespace ArrayEvolution
 
     public class Animal
     { 
-        public string Id { get;set;}
         public string Name { get; set; } = "TestName";
         public int Health { get; set; } = 100;
         public int Resources { get; set; } = 35;
@@ -51,7 +50,7 @@ namespace ArrayEvolution
         {
             var X = 20;
             var Y = 50;
-            var animals = GetAnimals(X, Y, 9);
+            var animals = GetAnimals(X, Y, 100);
             var fauna = GetFauna(X, Y, 900);
             var FaunaTotalInitHealth = fauna.Sum(x => x.Health);
             int i = 1;
@@ -81,8 +80,7 @@ namespace ArrayEvolution
             for (var i = 0; i < faunaCount; i++)
             {                                
                 var newFauna = new Fauna()
-                {
-                    Id = new Guid().ToString(),
+                { 
                     Name = "plant" + i,
                     PositionX = rng.Next(0, x),
                     PositionY = rng.Next(0, y - 1),
@@ -109,7 +107,8 @@ namespace ArrayEvolution
             Console.WriteLine($"Fauna Health Consumed: {faunaHealthConsumed}");
             Console.WriteLine($"Fauna Average Health: {faunaAverageHealth}");
             Console.WriteLine($"Average Health Consumed Per Tick: {averageHealthConsumedPerTick}");
-            foreach (var animal in animals.OrderBy(x=>x.Name))
+            Console.WriteLine($"Maximum Carrying Capacity: TODO");
+            foreach (var animal in animals.OrderBy(x=>x.Name).Take(20))
             {
                 var animalsJson = JsonConvert.SerializeObject(animal);
                 if (!animal.IsAlive) Console.ForegroundColor = ConsoleColor.DarkRed;
@@ -167,6 +166,10 @@ namespace ArrayEvolution
             //var spacing = (gridX * gridY) / animals.Count;
             var array = new string[gridX, gridY];
             var rng = new Random();
+            fauna.OrderByDescending(x=>x.Health)
+                .Take(fauna.Count()/2)
+                .ToList()
+                .ForEach(x => x.Health += 1); // give all fauna +1 health
 
             for (var x = 0; x < array.GetLength(0); x++)
             {
@@ -188,8 +191,8 @@ namespace ArrayEvolution
                         var plantEatAmount = rng.Next(0, healthToConsume); // Animals can consume more if hungry i.e. if 99 health can consume max of  1 health, if 1 health can consume max of 99 health
                         plant.Health -= plantEatAmount;
                         animal.Health += plantEatAmount;
-                        animals.Add(animal);
-                        if(plant.Health > 0)
+                        animals.Add(animal);                        
+                        if (plant.Health > 35 || rng.Next(8) == 5)
                         {
                             fauna.Add(plant);
                         }
