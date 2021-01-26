@@ -1,12 +1,10 @@
 ﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
-using System.Linq; 
-using System.Text;
-using System.Text.Json.Serialization;
-using System.Threading.Tasks;
-using System.Xml;
-using Formatting = Newtonsoft.Json.Formatting;
+using System.Linq;
+using System.Net.Http.Headers;
+using System.Text; 
+using System.Threading.Tasks; 
 
 #pragma warning disable 162
 
@@ -18,18 +16,26 @@ namespace ArrayEvolution
     { 
         public string Name { get; set; } = "TestName";
         public int Health { get; set; } = 100;
-        public int Resources { get; set; } = 35;
-        public int Size { get; set; } = 1;
+        public int Resources { get; set; } = 35; 
         public int PositionX { get; set; }
         public int PositionY { get; set; }
         public bool IsAlive
         {
             get
             {
-                if (Health > 0) return true;
-                else return false;
+                return Health > 0;
             }
         }
+        public List<Action> DNA { get; set; }
+    }
+
+    public enum Action
+    {
+        Up,
+        Down,
+        Left,
+        Right,
+        Stay
     }
 
     public class Fauna : Animal
@@ -38,8 +44,6 @@ namespace ArrayEvolution
 
     class Program
     {
-        
-
         private static void Main(string[] args)
         {
             var result = GameIterate().Result;
@@ -50,15 +54,15 @@ namespace ArrayEvolution
         {
             var X = 20;
             var Y = 50;
-            var animals = GetAnimals(X, Y, 100);
+            var animals = GetAnimals(X, Y, 20);
             var fauna = GetFauna(X, Y, 900);
             var FaunaTotalInitHealth = fauna.Sum(x => x.Health);
-            int i = 1;
+            var i = 1;
             do
             {                
                 string[,] array;
                 var faunaHealthTotal = fauna.Sum(x => x.Health);
-                (array, animals, fauna) = GetArray(X, Y, animals, fauna);
+                (array, animals, fauna) = GetArray(X, Y, animals, fauna, FaunaTotalInitHealth);
                 var faunaHealthDifference = faunaHealthTotal - fauna.Sum(x => x.Health);
                 Print(array);
                 animals = AnimalsTick(animals, X, Y);
@@ -70,7 +74,6 @@ namespace ArrayEvolution
 
             return true;
         }
-                
 
         private static List<Fauna> GetFauna(int x, int y, int faunaCount = 35)
         {
@@ -94,13 +97,14 @@ namespace ArrayEvolution
             }            
             return fauna;
         }
+
         private static void PrintStats(List<Animal> animals, List<Fauna> fauna, int faunaHealthDifference = 0, int faunaTotalInitHealth = 0, int tickCount = 0)
         {
             Console.WriteLine();
             var faunaHealthTotal = fauna.Sum(x => x.Health);
             var faunaHealthConsumed = faunaTotalInitHealth - fauna.Sum(x => x.Health);
             var averageHealthConsumedPerTick = faunaHealthConsumed == 0 ? 0 : faunaHealthConsumed / tickCount;
-            var faunaAverageHealth = fauna.Count() > 0 ? faunaHealthTotal / fauna.Count() : 0;
+            var faunaAverageHealth = fauna.Any() ? faunaHealthTotal / fauna.Count() : 0;
             Console.WriteLine($"Tick Count: {tickCount}");
             Console.WriteLine($"Fauna Health Delta: {faunaHealthDifference}");
             Console.WriteLine($"Fauna Health Total: {faunaHealthTotal} / {faunaTotalInitHealth} =  { ( fauna.Sum(x => x.Health) / (double) faunaTotalInitHealth) * 100.00 }%" );
@@ -122,24 +126,45 @@ namespace ArrayEvolution
         {
             var rng = new Random();            
             animals.Where(x=>x.IsAlive)
-                .ToList()
-                .ForEach(a =>
+            .ToList()
+            .ForEach(a =>
+            {
+                var action = a.DNA.First();
+                a.DNA.RemoveAt(0);
+                if (Action.Stay == action)
                 {
-                    var rngX = rng.Next(-1, 2);
-                    var rngY = rng.Next(-1, 2);
-                    if (rngX != 0 || rngY != 0)
-                    {
-                        a.Health += -3; // Decrement resources if animal moved
-                    }
-                    else
-                    {
-                        a.Health += -1; // Decrement resources if not moved
-                    }
-                    // walk randomly;
-                    a.PositionX += a.PositionX + rngX > x - 1 || a.PositionX + rngX < 0 ? 0 : rngX;
-                    a.PositionY += a.PositionY + rngY > y - 1 || a.PositionY + rngY < 0 ? 0 : rngY;
+                    a.Health += -1; // Decrement resources if not moved
                 }
-            );
+                else
+                {
+                    a.Health += -3; // Decrement resources if moved
+                }
+
+                switch (action)
+                {
+                    case Action.Stay:
+                        break;
+                    case Action.Left:
+                        a.PositionX += -1;
+                        break;
+                    case Action.Down:
+                        a.PositionY += -1;
+                        break;
+                    case Action.Up:
+                        a.PositionY += 1;
+                        break;
+                    case Action.Right:
+                        a.PositionX += 1;
+                        break;
+                }
+
+                a.DNA.Add(action); // add this action to the end of the list
+
+                // walk randomly;
+                //a.PositionX += a.PositionX + rngX > x - 1 || a.PositionX + rngX < 0 ? 0 : rngX;
+                //a.PositionY += a.PositionY + rngY > y - 1 || a.PositionY + rngY < 0 ? 0 : rngY;
+            }
+        );
 
             return animals;
         }
@@ -154,22 +179,39 @@ namespace ArrayEvolution
                 {
                     Name = "Ted" + i,
                     PositionX = rng.Next(0, x),
-                    PositionY = rng.Next(0, y - 1)
+                    PositionY = rng.Next(0, y - 1),
+                    Health = 100, 
+                    DNA = new List<Action>()
+                    {
+                        Action.Up,
+                        Action.Up,
+                        Action.Right,
+                        Action.Right,
+                        Action.Down,
+                        Action.Down,
+                        Action.Left,
+                        Action.Left,
+                        Action.Stay,
+                        Action.Stay
+                    }
                 });
             }
 
             return animals;
         }
 
-        private static (string[,], List<Animal>, List<Fauna>) GetArray(int gridX, int gridY, List<Animal> animals, List<Fauna> fauna)
+        private static (string[,], List<Animal>, List<Fauna>) GetArray(int gridX, int gridY, List<Animal> animals, List<Fauna> fauna, int faunaInitHealth)
         {
             //var spacing = (gridX * gridY) / animals.Count;
             var array = new string[gridX, gridY];
             var rng = new Random();
-            fauna.OrderByDescending(x=>x.Health)
-                .Take(fauna.Count()/2)
-                .ToList()
-                .ForEach(x => x.Health += 1); // give all fauna +1 health
+            if (fauna.Sum(x => x.Health ) < faunaInitHealth)
+            {
+                fauna.OrderByDescending(x => x.Health)
+                    .Take(fauna.Count() / 2)
+                    .ToList()
+                    .ForEach(x => x.Health += 1); // give all fauna +1 health
+            }
 
             for (var x = 0; x < array.GetLength(0); x++)
             {
@@ -186,7 +228,7 @@ namespace ArrayEvolution
                     {
                         animals.Remove(animal);
                         fauna.Remove(plant);
-                        var healthToConsume = (animal.Health - 100) * -1;
+                        var healthToConsume = (animal.Health > 100 ? 0 : animal.Health - 100) * -1;
                         if (healthToConsume > plant.Health) healthToConsume = plant.Health;
                         var plantEatAmount = rng.Next(0, healthToConsume); // Animals can consume more if hungry i.e. if 99 health can consume max of  1 health, if 1 health can consume max of 99 health
                         plant.Health -= plantEatAmount;
