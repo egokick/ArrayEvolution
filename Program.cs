@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net.Http.Headers;
 using System.Text; 
@@ -19,14 +20,9 @@ namespace ArrayEvolution
         public int Resources { get; set; } = 35; 
         public int PositionX { get; set; }
         public int PositionY { get; set; }
-        public bool IsAlive
-        {
-            get
-            {
-                return Health > 0;
-            }
-        }
+        public bool IsAlive => Health > 0;
         public List<Action> DNA { get; set; }
+        public int DeathAtTick { get; set; }
     }
 
     public enum Action
@@ -35,9 +31,15 @@ namespace ArrayEvolution
         Down,
         Left,
         Right,
-        Stay
+        Stay, 
+        Random
     }
-
+    public class Fitness
+    {
+        public int Batch { get; set; }
+        public int Score { get; set; }
+        public List<Action> DNA { get; set; }
+    }
     public class Fauna : Animal
     {
     }
@@ -50,25 +52,90 @@ namespace ArrayEvolution
             Console.Write(result);
         }
 
+        private static int GetBatchNumber()
+        {
+            if (!File.Exists("health.json")) return 1;
+
+            var fitnessText = File.ReadAllText("health.json");
+            try
+            {
+                var fitnessHistory = JsonConvert.DeserializeObject<List<Fitness>>(fitnessText);
+                return fitnessHistory
+                    .OrderByDescending(x => x.Batch)
+                    .First()
+                    .Batch;
+            }
+            catch (Exception ex)
+            {
+                return 1;
+            }
+        }
+
+        private static void RecordFitness(List<Animal> animals, int batch)
+        {
+            var fitness = new List<Fitness>();
+            animals.ForEach(a =>
+            {
+                fitness.Add(new Fitness()
+                {
+                    Batch = batch,
+                    DNA = a.DNA,
+                    Score = a.DeathAtTick
+                });
+            });
+            if (File.Exists("health.json"))
+            {
+                try
+                {
+                    var fitnessHistoryText = File.ReadAllText("health.json");
+                    var fitnessHistory = JsonConvert.DeserializeObject<List<Fitness>>(fitnessHistoryText);
+                    fitnessHistory.AddRange(fitness);
+                    File.WriteAllText("health.json", JsonConvert.SerializeObject(fitnessHistory, Formatting.Indented));
+                }
+                catch (Exception ex)
+                {
+                    // if this breaks it will erase all your existing data
+                    File.WriteAllText("health.json", JsonConvert.SerializeObject(fitness, Formatting.Indented));
+                }
+            }
+            else
+            {
+                File.WriteAllText("health.json", JsonConvert.SerializeObject(fitness, Formatting.Indented));
+            }
+        }
+
         private static async Task<bool> GameIterate()
         {
             var X = 20;
             var Y = 50;
-            var animals = GetAnimals(X, Y, 20);
+            List<Animal> animals = null;
             var fauna = GetFauna(X, Y, 900);
             var FaunaTotalInitHealth = fauna.Sum(x => x.Health);
-            var i = 1;
+            var tick = 1;
+            var batch = GetBatchNumber();
+
             do
-            {                
+            {
+                if (animals == null || !animals.Any(a => a.IsAlive)) // if no animals or all animals are dead
+                {
+                    if (animals != null)
+                    {
+                        RecordFitness(animals, batch);
+                        batch += 1;
+                        tick = 1;
+                    }
+                    animals = GetAnimals(X, Y, batch, 20);
+                }
+                
                 string[,] array;
                 var faunaHealthTotal = fauna.Sum(x => x.Health);
                 (array, animals, fauna) = GetArray(X, Y, animals, fauna, FaunaTotalInitHealth);
                 var faunaHealthDifference = faunaHealthTotal - fauna.Sum(x => x.Health);
                 Print(array);
-                animals = AnimalsTick(animals, X, Y);
-                PrintStats(animals, fauna, faunaHealthDifference, FaunaTotalInitHealth, i);
-                await Task.Delay(10);
-                i++;
+                animals = AnimalsTick(animals, X, Y, tick);
+                PrintStats(animals, fauna, faunaHealthDifference, FaunaTotalInitHealth, tick);
+                //await Task.Delay(10);
+                tick++;
             }
             while (true);
 
@@ -115,14 +182,13 @@ namespace ArrayEvolution
             foreach (var animal in animals.OrderBy(x=>x.Name).Take(20))
             {
                 var animalsJson = JsonConvert.SerializeObject(animal);
-                if (!animal.IsAlive) Console.ForegroundColor = ConsoleColor.DarkRed;
-                else Console.ForegroundColor = ConsoleColor.Gray;
+                Console.ForegroundColor = !animal.IsAlive ? ConsoleColor.DarkRed : ConsoleColor.Gray;
                 Console.WriteLine(animalsJson);
             }
             Console.ForegroundColor = ConsoleColor.Gray;
         }
         
-        private static List<Animal> AnimalsTick(List<Animal> animals, int x, int y)
+        private static List<Animal> AnimalsTick(List<Animal> animals, int x, int y, int tickCount)
         {
             var rng = new Random();            
             animals.Where(x=>x.IsAlive)
@@ -131,14 +197,6 @@ namespace ArrayEvolution
             {
                 var action = a.DNA.First();
                 a.DNA.RemoveAt(0);
-                if (Action.Stay == action)
-                {
-                    a.Health += -1; // Decrement resources if not moved
-                }
-                else
-                {
-                    a.Health += -3; // Decrement resources if moved
-                }
 
                 switch (action)
                 {
@@ -156,19 +214,38 @@ namespace ArrayEvolution
                     case Action.Right:
                         a.PositionX += 1;
                         break;
+                    case Action.Random:
+                        var rngX = rng.Next(-1, 2);
+                        var rngY = rng.Next(-1, 2);
+                        a.PositionX += a.PositionX + rngX > x - 1 || a.PositionX + rngX < 0 ? 0 : rngX;
+                        a.PositionY += a.PositionY + rngY > y - 1 || a.PositionY + rngY < 0 ? 0 : rngY;
+                        break;
+                }
+                if (Action.Stay == action)
+                {
+                    a.Health -= 1; // Decrement resources if not moved
                 }
 
+                if (action == Action.Random)
+                {
+                    a.Health -= 3;
+                }
+                else
+                {
+                    a.Health -= 3; // Decrement resources if moved
+                }
+                if (!a.IsAlive)
+                {
+                    a.DeathAtTick = tickCount;
+                }
                 a.DNA.Add(action); // add this action to the end of the list
-
-                // walk randomly;
-                //a.PositionX += a.PositionX + rngX > x - 1 || a.PositionX + rngX < 0 ? 0 : rngX;
-                //a.PositionY += a.PositionY + rngY > y - 1 || a.PositionY + rngY < 0 ? 0 : rngY;
+                
             }
         );
 
             return animals;
         }
-        private static List<Animal> GetAnimals(int x, int y, int animalCount = 10)
+        private static List<Animal> GetAnimals(int x, int y, int batch, int animalCount = 10)
         {
             var animals = new List<Animal>();
             var rng = new Random();
@@ -180,19 +257,19 @@ namespace ArrayEvolution
                     Name = "Ted" + i,
                     PositionX = rng.Next(0, x),
                     PositionY = rng.Next(0, y - 1),
-                    Health = 100, 
+                    Health = 100,
                     DNA = new List<Action>()
                     {
-                        Action.Up,
-                        Action.Up,
-                        Action.Right,
-                        Action.Right,
-                        Action.Down,
-                        Action.Down,
-                        Action.Left,
-                        Action.Left,
-                        Action.Stay,
-                        Action.Stay
+                        Action.Random,
+                        Action.Random,
+                        Action.Random,
+                        Action.Random,
+                        Action.Random,
+                        Action.Random,
+                        Action.Random,
+                        Action.Random,
+                        Action.Random,
+                        Action.Random
                     }
                 });
             }
@@ -205,7 +282,7 @@ namespace ArrayEvolution
             //var spacing = (gridX * gridY) / animals.Count;
             var array = new string[gridX, gridY];
             var rng = new Random();
-            if (fauna.Sum(x => x.Health ) < faunaInitHealth)
+            if (fauna.Sum(x => x.Health ) < faunaInitHealth && rng.Next(0,5) == 4)
             {
                 fauna.OrderByDescending(x => x.Health)
                     .Take(fauna.Count() / 2)
@@ -271,7 +348,7 @@ namespace ArrayEvolution
                 Console.ForegroundColor = defaultColor;
             }
             Console.SetCursorPosition(0, 21);
-            for(int i = 0; i < 10; i++)
+            for(var i = 0; i < 10; i++)
             {
                 Console.WriteLine("                                                                                                                                       ");
             }
