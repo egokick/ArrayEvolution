@@ -88,9 +88,9 @@ namespace ArrayEvolution
                 (array, animals, fauna) = GetArray(X, Y, animals, fauna, faunaTotalInitHealth);
                 var faunaHealthDifference = faunaHealthTotal - fauna.Sum(x => x.Health);
                 
-                if(tick%50==0) Print(array);
+                if(tick%50==0 || tick == 1) Print(array);
                 animals = AnimalsTick(animals, X, Y, tick);
-                if (tick % 50 == 0) PrintStats(animals, fauna, faunaHealthDifference, faunaTotalInitHealth, tick);
+                if (tick % 50 == 0 || tick==1) PrintStats(animals, fauna, faunaHealthDifference, faunaTotalInitHealth, tick);
                 //await Task.Delay(10);
                 tick++;
             }
