@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net.Http.Headers;
 using System.Text; 
 using System.Threading.Tasks; 
 
@@ -11,7 +10,13 @@ using System.Threading.Tasks;
 
 namespace ArrayEvolution
 {
-
+    public class PrintAnimal
+    {
+        public int Health;
+        public bool IsAlive => Health > 0;
+        public List<string> DNA { get; set; }
+        public int DeathAtTick { get; set; }
+    }
 
     public class Animal
     { 
@@ -48,8 +53,50 @@ namespace ArrayEvolution
     {
         private static void Main(string[] args)
         {
-            var result = GameIterate().Result;
+            var result = GameIterate();
             Console.Write(result);
+        }
+
+        private static bool GameIterate()
+        {
+            var X = 20;
+            var Y = 50;
+            List<Animal> animals = null;
+            List<Fauna> fauna = null;
+            var faunaTotalInitHealth = 0;
+            var tick = 1;
+            var batch = GetBatchNumber();
+
+            do
+            {
+                if (animals == null || !animals.Any(a => a.IsAlive) || fauna == null) // if no animals or all animals are dead or no fauna
+                {
+                    Console.Clear();
+                    if (animals != null)
+                    {
+                        RecordFitness(animals, batch);
+                        batch += 1;
+                        tick = 1;
+                    }
+                    animals = GetAnimals(X, Y, batch, 20);
+                    fauna = GetFauna(X, Y, 900);
+                    faunaTotalInitHealth = fauna.Sum(x => x.Health);
+                }
+
+                string[,] array;
+                var faunaHealthTotal = fauna.Sum(x => x.Health);
+                (array, animals, fauna) = GetArray(X, Y, animals, fauna, faunaTotalInitHealth);
+                var faunaHealthDifference = faunaHealthTotal - fauna.Sum(x => x.Health);
+                
+                if(tick%50==0) Print(array);
+                animals = AnimalsTick(animals, X, Y, tick);
+                if (tick % 50 == 0) PrintStats(animals, fauna, faunaHealthDifference, faunaTotalInitHealth, tick);
+                //await Task.Delay(10);
+                tick++;
+            }
+            while (true);
+
+            return true;
         }
 
         private static int GetBatchNumber()
@@ -87,59 +134,29 @@ namespace ArrayEvolution
             {
                 try
                 {
-                    var fitnessHistoryText = File.ReadAllText("health.json");
-                    var fitnessHistory = JsonConvert.DeserializeObject<List<Fitness>>(fitnessHistoryText);
+                    var fitnessHistory = GetFitnessHistory();
                     fitnessHistory.AddRange(fitness);
-                    File.WriteAllText("health.json", JsonConvert.SerializeObject(fitnessHistory, Formatting.Indented));
+                    File.WriteAllText("health.json", JsonConvert.SerializeObject(fitnessHistory));
                 }
                 catch (Exception ex)
                 {
                     // if this breaks it will erase all your existing data
-                    File.WriteAllText("health.json", JsonConvert.SerializeObject(fitness, Formatting.Indented));
+                    File.WriteAllText("health.json", JsonConvert.SerializeObject(fitness));
                 }
             }
             else
             {
-                File.WriteAllText("health.json", JsonConvert.SerializeObject(fitness, Formatting.Indented));
+                File.WriteAllText("health.json", JsonConvert.SerializeObject(fitness));
             }
         }
 
-        private static async Task<bool> GameIterate()
+        private static List<Fitness> GetFitnessHistory()
         {
-            var X = 20;
-            var Y = 50;
-            List<Animal> animals = null;
-            var fauna = GetFauna(X, Y, 900);
-            var FaunaTotalInitHealth = fauna.Sum(x => x.Health);
-            var tick = 1;
-            var batch = GetBatchNumber();
-
-            do
-            {
-                if (animals == null || !animals.Any(a => a.IsAlive)) // if no animals or all animals are dead
-                {
-                    if (animals != null)
-                    {
-                        RecordFitness(animals, batch);
-                        batch += 1;
-                        tick = 1;
-                    }
-                    animals = GetAnimals(X, Y, batch, 20);
-                }
-                
-                string[,] array;
-                var faunaHealthTotal = fauna.Sum(x => x.Health);
-                (array, animals, fauna) = GetArray(X, Y, animals, fauna, FaunaTotalInitHealth);
-                var faunaHealthDifference = faunaHealthTotal - fauna.Sum(x => x.Health);
-                Print(array);
-                animals = AnimalsTick(animals, X, Y, tick);
-                PrintStats(animals, fauna, faunaHealthDifference, FaunaTotalInitHealth, tick);
-                //await Task.Delay(10);
-                tick++;
-            }
-            while (true);
-
-            return true;
+            if (!File.Exists("health.json")) return new List<Fitness>();
+            
+            var fitnessHistoryText = File.ReadAllText("health.json");
+            var fitnessHistory = JsonConvert.DeserializeObject<List<Fitness>>(fitnessHistoryText);
+            return fitnessHistory;
         }
 
         private static List<Fauna> GetFauna(int x, int y, int faunaCount = 35)
@@ -182,8 +199,16 @@ namespace ArrayEvolution
             foreach (var animal in animals.OrderBy(x=>x.Name).Take(20))
             {
                 var animalsJson = JsonConvert.SerializeObject(animal);
+                var printAnimal = JsonConvert.DeserializeObject<PrintAnimal>(animalsJson);
+                printAnimal.DNA = new List<string>();
+                foreach (var action in animal.DNA)
+                {
+                    printAnimal.DNA.Add(action.ToString());
+                }
+
+                var printAnimalJson = JsonConvert.SerializeObject(printAnimal);
                 Console.ForegroundColor = !animal.IsAlive ? ConsoleColor.DarkRed : ConsoleColor.Gray;
-                Console.WriteLine(animalsJson);
+                Console.WriteLine(printAnimalJson);
             }
             Console.ForegroundColor = ConsoleColor.Gray;
         }
@@ -203,16 +228,16 @@ namespace ArrayEvolution
                     case Action.Stay:
                         break;
                     case Action.Left:
-                        a.PositionX += -1;
-                        break;
-                    case Action.Down:
                         a.PositionY += -1;
                         break;
+                    case Action.Down:
+                        a.PositionX += 1;
+                        break;
                     case Action.Up:
-                        a.PositionY += 1;
+                        a.PositionX += -1;
                         break;
                     case Action.Right:
-                        a.PositionX += 1;
+                        a.PositionY += 1;
                         break;
                     case Action.Random:
                         var rngX = rng.Next(-1, 2);
@@ -245,11 +270,80 @@ namespace ArrayEvolution
 
             return animals;
         }
+
+        private static List<Action> GetNewDNA()
+        {
+            // fitness is determined by the sum of ticks acquired by the group, i.e. higher group tick count is better
+            var fitnessHistory = GetFitnessHistory();
+            // get Max fitness
+            int mostFit = 0;
+            List<Action> dna = null;
+            foreach (var fitness in fitnessHistory.GroupBy(x => x.Batch))
+            {
+                var fitnessOfBatch = fitness.Sum(x => x.Score);
+                if (fitnessOfBatch > mostFit)
+                {
+                    mostFit = fitnessOfBatch;
+                    dna = fitness.First().DNA;
+                }
+            }
+
+            dna ??= new List<Action>() {Action.Stay};
+            dna = MutateDNA(dna);
+            return dna;
+        }
+
+        private static List<Action> MutateDNA(List<Action> dna)
+        {
+            var rng = new Random();
+            if (rng.Next(2) == 1) // add to dna sequence
+            {
+                var indexAddAction = rng.Next(dna.Count());
+                dna.Insert(indexAddAction, GetAnyAction());
+            }
+            if (rng.Next(2) == 1) // add to dna sequence
+            {
+                var indexAddAction = rng.Next(dna.Count());
+                dna.Insert(indexAddAction, GetAnyAction());
+            }
+            if (rng.Next(2) == 1) // add to dna sequence
+            {
+                var indexAddAction = rng.Next(dna.Count());
+                dna.Insert(indexAddAction, GetAnyAction());
+            }
+            if (rng.Next(2) == 1) // add to dna sequence
+            {
+                var indexAddAction = rng.Next(dna.Count());
+                dna.Insert(indexAddAction, GetAnyAction());
+            }
+            if (rng.Next(5) == 1 && dna.Count() > 1) // remove from dna sequence
+            {
+                var indexRemoveAction = rng.Next(dna.Count());
+                dna.RemoveAt(indexRemoveAction);
+            }
+            //if (rng.Next(2) == 0) 
+            //{ 
+            // Get an action and replace it with any action
+            var indexAction = rng.Next(dna.Count());
+            dna[indexAction] = GetAnyAction();
+            //}
+
+            return dna;
+        }
+
+        private static Action GetAnyAction()
+        {
+            var rng = new Random();
+            var actions = Enum.GetValues(typeof(Action));
+            var action = (Action)actions.GetValue(rng.Next(actions.Length));
+            return action;
+        }
+
         private static List<Animal> GetAnimals(int x, int y, int batch, int animalCount = 10)
         {
             var animals = new List<Animal>();
             var rng = new Random();
-            
+            var dna = GetNewDNA();
             for (var i = 0; i < animalCount; i++)
             {
                 animals.Add(new Animal()
@@ -258,19 +352,7 @@ namespace ArrayEvolution
                     PositionX = rng.Next(0, x),
                     PositionY = rng.Next(0, y - 1),
                     Health = 100,
-                    DNA = new List<Action>()
-                    {
-                        Action.Random,
-                        Action.Random,
-                        Action.Random,
-                        Action.Random,
-                        Action.Random,
-                        Action.Random,
-                        Action.Random,
-                        Action.Random,
-                        Action.Random,
-                        Action.Random
-                    }
+                    DNA = dna
                 });
             }
 
