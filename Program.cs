@@ -36,8 +36,7 @@ namespace ArrayEvolution
         Down,
         Left,
         Right,
-        Stay, 
-        Random
+        Stay        
     }
     public class Fitness
     {
@@ -53,11 +52,11 @@ namespace ArrayEvolution
     {
         private static void Main(string[] args)
         {
-            var result = GameIterate();
+            var result = GameIterate().Result;
             Console.Write(result);
         }
 
-        private static bool GameIterate()
+        private static async Task<bool> GameIterate()
         {
             var X = 20;
             var Y = 50;
@@ -88,10 +87,13 @@ namespace ArrayEvolution
                 (array, animals, fauna) = GetArray(X, Y, animals, fauna, faunaTotalInitHealth);
                 var faunaHealthDifference = faunaHealthTotal - fauna.Sum(x => x.Health);
                 
-                if(tick%50==0 || tick == 1) Print(array);
+                if(tick%10==0 || tick == 1) Print(array);
                 animals = AnimalsTick(animals, X, Y, tick);
-                if (tick % 50 == 0 || tick==1) PrintStats(animals, fauna, faunaHealthDifference, faunaTotalInitHealth, tick);
-                //await Task.Delay(10);
+                if (tick % 10 == 0 || tick == 1)
+                {
+                    PrintStats(animals, fauna, faunaHealthDifference, faunaTotalInitHealth, tick);
+                    await Task.Delay(100);
+                }
                 tick++;
             }
             while (true);
@@ -239,26 +241,27 @@ namespace ArrayEvolution
                     case Action.Right:
                         a.PositionY += 1;
                         break;
-                    case Action.Random:
-                        var rngX = rng.Next(-1, 2);
-                        var rngY = rng.Next(-1, 2);
-                        a.PositionX += a.PositionX + rngX > x - 1 || a.PositionX + rngX < 0 ? 0 : rngX;
-                        a.PositionY += a.PositionY + rngY > y - 1 || a.PositionY + rngY < 0 ? 0 : rngY;
-                        break;
+                    //case Action.Random:
+                    //    var rngX = rng.Next(-1, 2);
+                    //    var rngY = rng.Next(-1, 2);
+                    //    a.PositionX += a.PositionX + rngX > x - 1 || a.PositionX + rngX < 0 ? 0 : rngX;
+                    //    a.PositionY += a.PositionY + rngY > y - 1 || a.PositionY + rngY < 0 ? 0 : rngY;
+                    //    break;
                 }
                 if (Action.Stay == action)
                 {
                     a.Health -= 1; // Decrement resources if not moved
                 }
-
-                if (action == Action.Random)
-                {
-                    a.Health -= 3;
-                }
                 else
                 {
                     a.Health -= 3; // Decrement resources if moved
                 }
+
+                //if (action == Action.Random)
+                //{
+                //    a.Health -= 3;
+                //}
+
                 if (!a.IsAlive)
                 {
                     a.DeathAtTick = tickCount;
@@ -301,32 +304,32 @@ namespace ArrayEvolution
                 var indexAddAction = rng.Next(dna.Count());
                 dna.Insert(indexAddAction, GetAnyAction());
             }
-            if (rng.Next(2) == 1) // add to dna sequence
-            {
-                var indexAddAction = rng.Next(dna.Count());
-                dna.Insert(indexAddAction, GetAnyAction());
-            }
-            if (rng.Next(2) == 1) // add to dna sequence
-            {
-                var indexAddAction = rng.Next(dna.Count());
-                dna.Insert(indexAddAction, GetAnyAction());
-            }
-            if (rng.Next(2) == 1) // add to dna sequence
-            {
-                var indexAddAction = rng.Next(dna.Count());
-                dna.Insert(indexAddAction, GetAnyAction());
-            }
-            if (rng.Next(5) == 1 && dna.Count() > 1) // remove from dna sequence
-            {
-                var indexRemoveAction = rng.Next(dna.Count());
-                dna.RemoveAt(indexRemoveAction);
-            }
-            //if (rng.Next(2) == 0) 
-            //{ 
-            // Get an action and replace it with any action
-            var indexAction = rng.Next(dna.Count());
-            dna[indexAction] = GetAnyAction();
+            //if (rng.Next(2) == 1) // add to dna sequence
+            //{
+            //    var indexAddAction = rng.Next(dna.Count());
+            //    dna.Insert(indexAddAction, GetAnyAction());
             //}
+            ////if (rng.Next(2) == 1) // add to dna sequence
+            ////{
+            ////    var indexAddAction = rng.Next(dna.Count());
+            ////    dna.Insert(indexAddAction, GetAnyAction());
+            ////}
+            ////if (rng.Next(2) == 1) // add to dna sequence
+            ////{
+            ////    var indexAddAction = rng.Next(dna.Count());
+            ////    dna.Insert(indexAddAction, GetAnyAction());
+            ////}
+            ////if (rng.Next(5) == 1 && dna.Count() > 1) // remove from dna sequence
+            ////{
+            ////    var indexRemoveAction = rng.Next(dna.Count());
+            ////    dna.RemoveAt(indexRemoveAction);
+            ////}
+            if (rng.Next(2) == 0)
+            {
+              // Get an action and replace it with any action
+               var indexAction = rng.Next(dna.Count());
+                dna[indexAction] = GetAnyAction();
+            }
 
             return dna;
         }
